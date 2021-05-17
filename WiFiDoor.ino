@@ -1,5 +1,6 @@
 #include <Streaming.h>
 #include <WiFiEsp.h>
+#include <Servo.h>
 #include "secrets.h"
 #include "ThingSpeak.h" // always include thingspeak header file after other header files and custom macros
 
@@ -18,8 +19,9 @@ WiFiEspClient client;
 RingBuffer buf(64);
 char cmdStr[128];
 
-
-int doorPin =7 ;
+Servo myServo;
+int doorPin = 7;
+int switchPin = 8;
 
 
 
@@ -29,16 +31,37 @@ void setup()
   initWiFi();
   ThingSpeak.begin(client);
   pinMode(doorPin,INPUT);
+  myServo.attach(switchPin);//門開關
+  myServo.write(0);
 }
 
 void loop()
 {
+  //傳送門狀態
   if(digitalRead(doorPin) == HIGH){
     writeDataToThingSpeak(1);
   }
   else if(digitalRead(doorPin) == LOW){
     writeDataToThingSpeak(0);
   }
+
+  //接收關門指令
+  int switchCode = 0;
+  
+  float doorSwitch = ThingSpeak.readFloatField(myChannelNumber,2,myReadAPIKey);
+  switchCode = ThingSpeak.getLastReadStatus();
+  if(switchCode == 200){
+    Serial.println("Switch = " + String(doorSwitch));
+    if(doorSwitch == 3.1415926535){
+       myServo.write(100);
+       delay(1000);
+       myServo.write(0);
+    }  
+  }
+  else{
+    Serial.println("Problem reading channel. HTTP error code " + String(switchCode)); 
+  }
+  
   delay(16000);
 }
 
